@@ -5,7 +5,7 @@ micro2m = 1000
 #tsinghua_prefix = ('166.111','59.66','101.6','101.5','183.172','183.173','118.229')
 
 class OneFlow():
-    def __init__(self,srcip,srcport,dstip,dstport,first,msec_first = 0,last,msec_last = 0,packets,tbytes):
+    def __init__(self,srcip,srcport,dstip,dstport,first,msec_first,last,msec_last,packets,tbytes):
         self.srcip = srcip
         self.dstip = dstip
         self.srcport = srcport
@@ -32,10 +32,10 @@ class OneFlow():
         return self.packets, self.tbytes
 
     def get_srcip(self):
-        return self.srcip
+        return self.srcip, self.srcport
     
     def get_dstip(self):
-        return self.dstip
+        return self.dstip, self.dstport
 
     def cal_delta(self,oth):
         return oth.get_first_time() - self.first_time
@@ -68,9 +68,49 @@ class OneFlow():
         prtstr = self.srcip + ' => ' + self.dstip + ':' + str(self.dstport) + ' '+ self.first_time.strftime("%Y-%m-%d %H:%M:%S.%f") + ' ' + self.last_time.strftime("%Y-%m-%d %H:%M:%S.%f")+ ' ' + str(self.packets) + ' ' + str(self.tbytes)
         return prtstr
 
+class FlowGroup(OneFlow):
+    def __init__(self,srcip,srcport,dstip,dstport,first = datetime.datetime(2000,1,1,0,0,0),msec_first = 0,last = datetime.datetime(2000,1,1,0,0,0),msec_last = 0,packets = 0,tbytes = 0,flowcount = 0):
+        OneFlow.__init__(self,srcip,srcport,dstip,dstport,first,msec_first,last,msec_last,packets,tbytes)
+
+    def set_first(time):
+        self.first = time
+
+    def set_last(time):
+        self.last = time
+
+    def set_flowcount(count):
+        flowcount = count
+
+    def set_tuple(srcip,srcport,dstip,dstport):
+        self.srcip = srcip
+        self.srcport = srcport
+        self.dstip = dstip
+        self.dstport = dstport
+
+    def add_flow(flow):
+        if flowcount == 0:
+            self.first = flow.get_first_time()
+            self.last = flow.get_last_time()
+            self.packets, self.tbytes = flow.get_pnumber()
+        if flow.get_first_time() - self.first_time > datetime.timedelta(0,5,0):
+            return False
+        else:
+            flowcount += 1
+            packets += flow.get_pnumber()[0]
+            tbytes += flow.get_pnumber()[1]
+            if flow.is_first_early():
+                self.first = flow.get_first_time()
+            if flow.is_last_late():
+                if flow.get_first_time() - self.first_time > datetime.timedelta(0,2,0) and flow.get_first_time() > self.last_time():
+                    return True
+                else:
+                    self.last = flow.get_last_time()
+                    return True
+
+
 class IcmpFlow(OneFlow):
-    def __init__(self,srcip,srcport,dstip,dstport,first,msec_first = 0,last,msec_last = 0,packets,tbytes,flowtype):
-        OneFlow.__init__(self,srcip,srcport,dstip,dstport,first,msec_first = msec_first,last,msec_last = msec_last,packets,tbytes)
+    def __init__(self,srcip,srcport,dstip,dstport,first,last,msec_first,msec_last,packets,tbytes,flowtype):
+        OneFlow.__init__(self,srcip,srcport,dstip,dstport,first,msec_first,last,msec_last,packets,tbytes)
         if self.packets == 0:
             raise ValueError('icmp type can not be analyzed!')
         else:
