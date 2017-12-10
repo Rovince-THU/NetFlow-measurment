@@ -108,15 +108,13 @@ class FlowGroup(OneFlow):
             if flow.get_first_time() < self.get_first_time():
                 self.first_time = flow.get_first_time()
             if flow.get_last_time() > self.get_last_time():
-                self.last_time = flow.get_last_time()
-            return True
-#                if flow.get_first_time() - self.first_time > datetime.timedelta(0,2,0) and flow.get_first_time() > self.last_time:
- #                   return True
-#                else:
-#                    self.last_time = flow.get_last_time()
-#                    return True
-#            else:
-#                return True
+                if flow.get_first_time() - self.first_time > datetime.timedelta(0,2,0) and flow.get_first_time() > self.last_time:
+                    return True
+                else:
+                    self.last_time = flow.get_last_time()
+                    return True
+            else:
+                return True
 
     def display_string(self):
         return self.print_string() + ' ' + str(self.flowcount) 
