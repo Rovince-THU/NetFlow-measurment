@@ -1,32 +1,216 @@
 import pynfdump
 import datetime
 import Flow
+import json
+
+def p_detail(ip_dict,agg_dict):
+
+    fout = open('./out2.txt','w')
+    result_list = [0,0,0,0,0,0,0,0,0,0]
+
+    for key in ip_dict:
+        str1 = ' '.join(ip_dict[key]['ICMP'])
+        prtstr = ''
+        if agg_dict[key]['time_itv'] in [-1,-2,-3,-4]:
+            t_itv = str(agg_dict[key]['time_itv'])
+        else:
+            t_itv = str(agg_dict[key]['time_itv'].seconds)+'s'+str(agg_dict[key]['time_itv'].microseconds)[:-3]+'ms'
+        prtstr += \
+            key+': '+str1+' '+\
+            t_itv+\
+            ' flowTimeErrorIn: '+str(agg_dict[key]['flow_time_error_in'][0])+':'+str(agg_dict[key]['flow_time_error_in'][1])+\
+            ' flowTimeErrorOut: ' +str(agg_dict[key]['flow_time_error_out'][0])+':'+str(agg_dict[key]['flow_time_error_out'][1])+\
+            ' FirstTimeError:'
+        ddr = agg_dict[key]['flow_time_error_in'][0] + agg_dict[key]['flow_time_error_out'][0]
+        if agg_dict[key]['first_time_error']:
+            prtstr += ' True'
+        else:
+            prtstr += ' False'
+
+        prtstr += ' LastTimeError:'
+        if agg_dict[key]['last_time_error']:
+            prtstr += ' True'
+        else:
+            prtstr += ' False'
+
+        avi = [False,False]
+        
+        if float(agg_dict[key]['ICMP'][0]) == 10000:
+            result_list[1] += 1
+
+        if agg_dict[key]['time_itv'] == -2:
+            result_list[0] += 1
+            avi[0] = True
+        elif agg_dict[key]['time_itv'] == -1:
+            result_list[5] += 1
+        elif agg_dict[key]['time_itv'] == -3:
+            pass
+        elif agg_dict[key]['time_itv'] == -4:
+            pass
+        elif agg_dict[key]['first_time_error']:
+            result_list[8] += 1
+            ivv = agg_dict[key]['time_itv']
+            rtt = ivv.seconds*1000 + ivv.microseconds/1000
+            rttmin = float(agg_dict[key]['ICMP'][1])
+            rttmax = float(agg_dict[key]['ICMP'][2])
+            rttavg = float(agg_dict[key]['ICMP'][0])
+            if rttmin - 1 < rtt < rttmax + 1:
+                result_list[6] += 1
+                avi[0] = True
+            if abs(rtt - rttavg)/rttavg < 0.1 or rttavg -2 < rtt < rttavg + 2:
+                result_list[7] += 1
+                avi[1] = True
+
+        else:
+            result_list[4] += 1
+            ivv = agg_dict[key]['time_itv']
+            rtt = ivv.seconds*1000 + ivv.microseconds/1000
+            rttmin = float(agg_dict[key]['ICMP'][1])
+            rttmax = float(agg_dict[key]['ICMP'][2])
+            rttavg = float(agg_dict[key]['ICMP'][0])
+            if rttmin - 1 < rtt < rttmax + 1:
+                result_list[2] += 1
+                avi[0] = True
+            if abs(rtt - rttavg)/rttavg < 0.1 or rttavg -2 < rtt < rttavg + 2:
+                result_list[3] += 1
+                avi[1] = True
+
+#            if (not avi[0]) and (not avi[1]):
+#                print agg_dict[key]['time_itv']
+#                print t_itv
+#                print rtt,rttmin,rttmax,rttavg
+#        if ponce < 10:
+#            print agg_dict[key]['time_itv']
+#            print t_itv
+#            print rtt,rttmin,rttmax,rttavg
+#            ponce += 1
+        
+        prtstr += ' '+str(avi[0])+' '+str(avi[1])
+
+        prtstr += '\n\tIN:\n'
+
+        fout.write(prtstr)
+        for item in ip_dict[key]['IN']:
+            fout.write('\t\t'+item.display_string()+'\n')
+        fout.write('\n\tOUT:\n')
+        for item in ip_dict[key]['OUT']:
+            fout.write('\t\t'+item.display_string()+'\n')
+
+        fout.write('\n')
+
+        fout.write('\tAGG_IN\n')
+        for item in agg_dict[key]['IN']:
+            fout.write('\t\t'+item.display_string()+'\n')
+        fout.write('\n\tAGG_OUT:\n')
+        for item in agg_dict[key]['OUT']:
+            fout.write('\t\t'+item.display_string()+'\n')
+
+        fout.write('\n')
+    print result_list
+    fout.close()
+
+def p_json(ip_dict,agg_dict):
+
+    fout = open('out_json.dat','w')
+
+    result_list = [0,0,0,0,0,0,0,0,0,0]
+    json_dict = {}
+
+    for key in ip_dict:
+        avi = [False,False]
+        rttmin = float(agg_dict[key]['ICMP'][1])
+        rttmax = float(agg_dict[key]['ICMP'][2])
+        rttavg = float(agg_dict[key]['ICMP'][0])
+        if agg_dict[key]['time_itv'] == -2:
+            result_list[0] += 1
+            avi[0] = True
+            rtt = -2
+            json_dict[key] = [rtt,rttmin,rttmax,rttavg,agg_dict[key]['first_time_error'],agg_dict[key]['last_time_error']]
+            if agg_dict[key]['ICMP'][0] == '10000':
+                json_dict[key].append(True)
+                json_dict[key].append(True)
+            else:
+                json_dict[key].append(False)
+                json_dict[key].append(False)
+        elif agg_dict[key]['time_itv'] == -1:
+            rtt = -1
+            json_dict[key] = [rtt,rttmin,rttmax,rttavg,agg_dict[key]['first_time_error'],agg_dict[key]['last_time_error'],False,False]
+        elif agg_dict[key]['time_itv'] == -3:
+            json_dict[key] = [-3,agg_dict[key]['ICMP'][0],agg_dict[key]['ICMP'][1],agg_dict[key]['ICMP'][2],agg_dict[key]['first_time_error'],agg_dict[key]['last_time_error']]
+            if agg_dict[key]['ICMP'][0] == '10000':
+                json_dict[key].append(True)
+                json_dict[key].append(True)
+            else:
+                json_dict[key].append(False)
+                json_dict[key].append(False)
+        elif agg_dict[key]['time_itv'] == -4:
+            json_dict[key] = [-4,rttmin,rttmax,rttavg,agg_dict[key]['first_time_error'],agg_dict[key]['last_time_error']]
+            if agg_dict[key]['ICMP'][0] == '10000':
+                json_dict[key].append(True)
+                json_dict[key].append(True)
+            else:
+                json_dict[key].append(False)
+                json_dict[key].append(False)
+        elif agg_dict[key]['first_time_error']:
+            result_list[8] += 1
+            ivv = agg_dict[key]['time_itv']
+            rtt = ivv.seconds*1000 + ivv.microseconds/1000
+            rttmin = float(agg_dict[key]['ICMP'][1])
+            rttmax = float(agg_dict[key]['ICMP'][2])
+            rttavg = float(agg_dict[key]['ICMP'][0])
+            if rttmin - 1 < rtt < rttmax + 1:
+                result_list[6] += 1
+                avi[0] = True
+            if abs(rtt - rttavg)/rttavg < 0.1 or rttavg -2 < rtt < rttavg + 2:
+                result_list[7] += 1
+                avi[1] = True
+            json_dict[key] = [rtt,rttmin,rttmax,rttavg,agg_dict[key]['first_time_error'],agg_dict[key]['last_time_error'],avi[0],avi[1]]
+
+        else:
+            result_list[4] += 1
+            ivv = agg_dict[key]['time_itv']
+            rtt = ivv.seconds*1000 + ivv.microseconds/1000
+            rttmin = float(agg_dict[key]['ICMP'][1])
+            rttmax = float(agg_dict[key]['ICMP'][2])
+            rttavg = float(agg_dict[key]['ICMP'][0])
+            if rttmin - 1 < rtt < rttmax + 1:
+                result_list[2] += 1
+                avi[0] = True
+            if abs(rtt - rttavg)/rttavg < 0.1 or rttavg -2 < rtt < rttavg + 2:
+                result_list[3] += 1
+                avi[1] = True
+            json_dict[key] = [rtt,agg_dict[key]['ICMP'][0],agg_dict[key]['ICMP'][1],agg_dict[key]['ICMP'][2],agg_dict[key]['first_time_error'],agg_dict[key]['last_time_error'],avi[0],avi[1]]
+
+    fout.write(json.dumps(json_dict))
+    fout.close()
 
 
 def main():
+    
+    print_detail = False
+    print_json = True
+
     #d = pynfdump.Dumper('/data2/datasource/',profile='16/',sources=['nfcapd.201711161000','nfcapd.201711161005'])
     d = pynfdump.Dumper()
     ponce = 0
 #    d.set_where(start=None,end=None,filename='/data2/datasource/16/nfcapd.201711161000')
-    dstring = '/data2/datasource/16/'
-    for i in range(6):
-        nstr = str(i*5)
-        if len(nstr) < 2:
-            nstr = '0' + nstr
-        dstring += 'nfcapd.2017111610' + nstr + ':'
+#    dstring = '/data2/datasource/16/'
+#    for i in range(6):
+#        nstr = str(i*5)
+#        if len(nstr) < 2:
+#            nstr = '0' + nstr
+#        dstring += 'nfcapd.2017111610' + nstr + ':'
+#
+#    dstring = dstring[:-1]
 
-    dstring = dstring[:-1]
-
-    d.set_where(start=None,end=None,dirfiles='/data2/datasource/16/nfcapd.201711161030:nfcapd.201711161100')
+    d.set_where(start=None,end=None,dirfiles='/data2/datasource/16/nfcapd.201711161000:nfcapd.201711161030')
 #    d.set_where(start=None,end=None,filename='/data2/datasource/16/nfcapd.201711161000')
 
     records = d.search('proto icmp and host 166.111.8.241')
 
     fin = open('/data2/datasource/ICMP/time/10:00:00.txt','r')
-    fout = open('./out2.txt','w')
     ip_dict = {}
     agg_dict = {}
-    result_list = [0,0,0,0,0,0,0,0,0,0]
 
     for line in fin.readlines():
         items = line.split('#')
@@ -146,7 +330,7 @@ def main():
             if agg_dict[key]['time_itv'] in [-2,-4]:
                 break
             elif agg_dict[key]['time_itv'] != -3:
-                if item['OUT'].get_first_time() > datetime.datetime(2017,11,16,10,58,0):
+                if item['OUT'].get_first_time() > datetime.datetime(2017,11,16,10,28,0):
                     break
                 else:
                     agg_dict[key]['time_itv'] = -4
@@ -164,110 +348,17 @@ def main():
                 agg_dict[key]['time_itv'] = time_itvf
                 if time_itvl < dtzero:
                     agg_dict[key]['last_time_error'] = True
+                elif time_itvf > datetime.timedelta(0,0,100000):
+                    if time_itvl < datetime.timedelta(0,0,100000):
+                        agg_dict[key]['time_itv'] = time_itvl
+                    elif datetime.timedelta(0,0,-50000) < time_itvl - time_itvf <  datetime.timedelta(0,0,50000):
+                        agg_dict[key]['time_itv'] = (time_itvf+time_itvl)/2
 
-            
+    if print_detail:
+        p_detail(ip_dict,agg_dict)
 
-    for key in ip_dict:
-        str1 = ' '.join(ip_dict[key]['ICMP'])
-        prtstr = ''
-        if agg_dict[key]['time_itv'] in [-1,-2,-3,-4]:
-            t_itv = str(agg_dict[key]['time_itv'])
-        else:
-            t_itv = str(agg_dict[key]['time_itv'].seconds)+'s'+str(agg_dict[key]['time_itv'].microseconds)[:-3]+'ms'
-        prtstr += \
-            key+': '+str1+' '+\
-            t_itv+\
-            ' flowTimeErrorIn: '+str(agg_dict[key]['flow_time_error_in'][0])+':'+str(agg_dict[key]['flow_time_error_in'][1])+\
-            ' flowTimeErrorOut: ' +str(agg_dict[key]['flow_time_error_out'][0])+':'+str(agg_dict[key]['flow_time_error_out'][1])+\
-            ' FirstTimeError:'
-        ddr = agg_dict[key]['flow_time_error_in'][0] + agg_dict[key]['flow_time_error_out'][0]
-        if agg_dict[key]['first_time_error']:
-            prtstr += ' True'
-        else:
-            prtstr += ' False'
-
-        prtstr += ' LastTimeError:'
-        if agg_dict[key]['last_time_error']:
-            prtstr += ' True'
-        else:
-            prtstr += ' False'
-
-        avi = [False,False]
-        
-        if float(agg_dict[key]['ICMP'][0]) == 10000:
-            result_list[1] += 1
-
-        if agg_dict[key]['time_itv'] == -2:
-            result_list[0] += 1
-            avi[0] = True
-        elif agg_dict[key]['time_itv'] == -1:
-            result_list[5] += 1
-        elif agg_dict[key]['time_itv'] == -3:
-            pass
-        elif agg_dict[key]['time_itv'] == -4:
-            pass
-        elif agg_dict[key]['first_time_error']:
-            result_list[8] += 1
-            ivv = agg_dict[key]['time_itv']
-            rtt = ivv.seconds*1000 + ivv.microseconds/1000
-            rttmin = float(agg_dict[key]['ICMP'][1])
-            rttmax = float(agg_dict[key]['ICMP'][2])
-            rttavg = float(agg_dict[key]['ICMP'][0])
-            if rttmin - 1 < rtt < rttmax + 1:
-                result_list[6] += 1
-                avi[0] = True
-            if abs(rtt - rttavg)/rttavg < 0.1 or rttavg -2 < rtt < rttavg + 2:
-                result_list[7] += 1
-                avi[1] = True
-
-        else:
-            result_list[4] += 1
-            ivv = agg_dict[key]['time_itv']
-            rtt = ivv.seconds*1000 + ivv.microseconds/1000
-            rttmin = float(agg_dict[key]['ICMP'][1])
-            rttmax = float(agg_dict[key]['ICMP'][2])
-            rttavg = float(agg_dict[key]['ICMP'][0])
-            if rttmin - 1 < rtt < rttmax + 1:
-                result_list[2] += 1
-                avi[0] = True
-            if abs(rtt - rttavg)/rttavg < 0.1 or rttavg -2 < rtt < rttavg + 2:
-                result_list[3] += 1
-                avi[1] = True
-
-            if (not avi[0]) and (not avi[1]):
-                print agg_dict[key]['time_itv']
-                print t_itv
-                print rtt,rttmin,rttmax,rttavg
-#        if ponce < 10:
-#            print agg_dict[key]['time_itv']
-#            print t_itv
-#            print rtt,rttmin,rttmax,rttavg
-#            ponce += 1
-        
-        prtstr += ' '+str(avi[0])+' '+str(avi[1])
-
-        prtstr += '\n\tIN:\n'
-
-        fout.write(prtstr)
-        for item in ip_dict[key]['IN']:
-            fout.write('\t\t'+item.display_string()+'\n')
-        fout.write('\n\tOUT:\n')
-        for item in ip_dict[key]['OUT']:
-            fout.write('\t\t'+item.display_string()+'\n')
-
-        fout.write('\n')
-
-        fout.write('\tAGG_IN\n')
-        for item in agg_dict[key]['IN']:
-            fout.write('\t\t'+item.display_string()+'\n')
-        fout.write('\n\tAGG_OUT:\n')
-        for item in agg_dict[key]['OUT']:
-            fout.write('\t\t'+item.display_string()+'\n')
-
-        fout.write('\n')
-
-
-    print result_list
+    if print_json:
+        p_json(ip_dict,agg_dict)
 
 if __name__ == '__main__':
     main()
