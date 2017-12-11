@@ -6,6 +6,7 @@ import Flow
 def main():
     #d = pynfdump.Dumper('/data2/datasource/',profile='16/',sources=['nfcapd.201711161000','nfcapd.201711161005'])
     d = pynfdump.Dumper()
+    ponce = 0
 #    d.set_where(start=None,end=None,filename='/data2/datasource/16/nfcapd.201711161000')
     dstring = '/data2/datasource/16/'
     for i in range(6):
@@ -16,7 +17,7 @@ def main():
 
     dstring = dstring[:-1]
 
-    d.set_where(start=None,end=None,dirfiles='/data2/datasource/16/nfcapd.201711161000:nfcapd.201711161030')
+    d.set_where(start=None,end=None,dirfiles='/data2/datasource/16/nfcapd.201711161030:nfcapd.201711161100')
 #    d.set_where(start=None,end=None,filename='/data2/datasource/16/nfcapd.201711161000')
 
     records = d.search('proto icmp and host 166.111.8.241')
@@ -25,6 +26,7 @@ def main():
     fout = open('./out2.txt','w')
     ip_dict = {}
     agg_dict = {}
+    result_list = [0,0,0,0,0,0,0,0,0,0]
 
     for line in fin.readlines():
         items = line.split('#')
@@ -144,7 +146,7 @@ def main():
             if agg_dict[key]['time_itv'] in [-2,-4]:
                 break
             elif agg_dict[key]['time_itv'] != -3:
-                if item['OUT'].get_first_time() > datetime.datetime(2017,11,16,10,28,0):
+                if item['OUT'].get_first_time() > datetime.datetime(2017,11,16,10,58,0):
                     break
                 else:
                     agg_dict[key]['time_itv'] = -4
@@ -179,8 +181,6 @@ def main():
             ' flowTimeErrorOut: ' +str(agg_dict[key]['flow_time_error_out'][0])+':'+str(agg_dict[key]['flow_time_error_out'][1])+\
             ' FirstTimeError:'
         ddr = agg_dict[key]['flow_time_error_in'][0] + agg_dict[key]['flow_time_error_out'][0]
-        if ddr != 0:
-            print key
         if agg_dict[key]['first_time_error']:
             prtstr += ' True'
         else:
@@ -191,6 +191,60 @@ def main():
             prtstr += ' True'
         else:
             prtstr += ' False'
+
+        avi = [False,False]
+        
+        if float(agg_dict[key]['ICMP'][0]) == 10000:
+            result_list[1] += 1
+
+        if agg_dict[key]['time_itv'] == -2:
+            result_list[0] += 1
+            avi[0] = True
+        elif agg_dict[key]['time_itv'] == -1:
+            result_list[5] += 1
+        elif agg_dict[key]['time_itv'] == -3:
+            pass
+        elif agg_dict[key]['time_itv'] == -4:
+            pass
+        elif agg_dict[key]['first_time_error']:
+            result_list[8] += 1
+            ivv = agg_dict[key]['time_itv']
+            rtt = ivv.seconds*1000 + ivv.microseconds/1000
+            rttmin = float(agg_dict[key]['ICMP'][1])
+            rttmax = float(agg_dict[key]['ICMP'][2])
+            rttavg = float(agg_dict[key]['ICMP'][0])
+            if rttmin - 1 < rtt < rttmax + 1:
+                result_list[6] += 1
+                avi[0] = True
+            if abs(rtt - rttavg)/rttavg < 0.1 or rttavg -2 < rtt < rttavg + 2:
+                result_list[7] += 1
+                avi[1] = True
+
+        else:
+            result_list[4] += 1
+            ivv = agg_dict[key]['time_itv']
+            rtt = ivv.seconds*1000 + ivv.microseconds/1000
+            rttmin = float(agg_dict[key]['ICMP'][1])
+            rttmax = float(agg_dict[key]['ICMP'][2])
+            rttavg = float(agg_dict[key]['ICMP'][0])
+            if rttmin - 1 < rtt < rttmax + 1:
+                result_list[2] += 1
+                avi[0] = True
+            if abs(rtt - rttavg)/rttavg < 0.1 or rttavg -2 < rtt < rttavg + 2:
+                result_list[3] += 1
+                avi[1] = True
+
+            if (not avi[0]) and (not avi[1]):
+                print agg_dict[key]['time_itv']
+                print t_itv
+                print rtt,rttmin,rttmax,rttavg
+#        if ponce < 10:
+#            print agg_dict[key]['time_itv']
+#            print t_itv
+#            print rtt,rttmin,rttmax,rttavg
+#            ponce += 1
+        
+        prtstr += ' '+str(avi[0])+' '+str(avi[1])
 
         prtstr += '\n\tIN:\n'
 
@@ -211,6 +265,9 @@ def main():
             fout.write('\t\t'+item.display_string()+'\n')
 
         fout.write('\n')
+
+
+    print result_list
 
 if __name__ == '__main__':
     main()
